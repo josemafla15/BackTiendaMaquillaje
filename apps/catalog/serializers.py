@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 from rest_framework import serializers
 
@@ -104,7 +105,6 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
 
 class ProductListSerializer(serializers.ModelSerializer):
-    """Serializer ligero para listados y búsqueda."""
     brand_name = serializers.CharField(source="brand.name", read_only=True)
     base_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
@@ -112,6 +112,12 @@ class ProductListSerializer(serializers.ModelSerializer):
     variant_count = serializers.IntegerField(
         source="variants.count", read_only=True
     )
+    cover_image = serializers.SerializerMethodField()
+
+    def get_cover_image(self, obj) -> str | None:
+        if obj.cover_image:
+            return obj.cover_image.url
+        return None
 
     class Meta:
         model = Product
@@ -121,13 +127,29 @@ class ProductListSerializer(serializers.ModelSerializer):
             "is_active", "is_featured",
         ]
 
-
 class ProductDetailSerializer(serializers.ModelSerializer):
     """Serializer completo para el detalle del producto."""
     brand = BrandSerializer(read_only=True)
     variants = VariantReadSerializer(many=True, read_only=True)
     gallery = ProductImageSerializer(many=True, read_only=True)
-    categories = CategorySerializer(many=True, read_only=True)
+    categories = serializers.SerializerMethodField()
+
+    cover_image = serializers.SerializerMethodField()
+
+    def get_cover_image(self, obj) -> str | None:
+        if obj.cover_image:
+            return obj.cover_image.url
+        return None
+    
+    def get_categories(self, obj) -> list:
+        # Solo retorna categorías raíz (sin parent) que pertenecen al producto
+        # Las hijas se ven a través del children del padre
+        all_ids = set(obj.categories.values_list("id", flat=True))
+        top_level = obj.categories.filter(parent=None)
+        # Categorías sin parent propio dentro del producto
+        orphans = obj.categories.exclude(parent=None).exclude(parent_id__in=all_ids)
+        qs = (top_level | orphans).distinct()
+        return CategorySerializer(qs, many=True).data
 
     class Meta:
         model = Product
@@ -142,19 +164,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 class ProductWriteSerializer(serializers.ModelSerializer):
     """
     Permite crear un Producto con sus Variantes en una sola operación.
-    Payload esperado:
-    {
-      "name": "Labial Matte Velvet",
-      "brand": "<uuid>",
-      "category_ids": ["<uuid1>", "<uuid2>"],
-      "variants": [
-        {"sku": "LMV-001-MOR", "name": "Morado", "price": 35000,
-         "color_code": "#6A0DAD", "quantity": 50},
-        {"sku": "LMV-001-ROS", "name": "Rosado", "price": 35000,
-         "color_code": "#FF69B4", "quantity": 30}
-      ],
-      ...
-    }
+    Soporta tanto JSON como form-data (multipart) para imágenes.
     """
     variants = VariantWriteSerializer(many=True, required=False)
     category_ids = serializers.ListField(
@@ -170,6 +180,23 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             "variants", "category_ids",
         ]
 
+    def to_internal_value(self, data):
+        # Convierte category_ids y variants de string a lista/dict
+        # cuando vienen de form-data (multipart). JSON no se ve afectado.
+        if isinstance(data.get("category_ids"), str):
+            try:
+                data = data.copy()
+                data["category_ids"] = json.loads(data["category_ids"])
+            except json.JSONDecodeError:
+                pass
+        if isinstance(data.get("variants"), str):
+            try:
+                data = data.copy()
+                data["variants"] = json.loads(data["variants"])
+            except json.JSONDecodeError:
+                pass
+        return super().to_internal_value(data)
+
     def create(self, validated_data: dict[str, Any]) -> Product:
         variants_data = validated_data.pop("variants", [])
         category_ids = validated_data.pop("category_ids", [])
@@ -182,10 +209,6 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             )
 
         for variant_data in variants_data:
-            variant_serializer = VariantWriteSerializer(data={
-                **variant_data, "product": product.id
-            })
-            # Usar el serializer interno para que gestione el Stock
             quantity = variant_data.pop("quantity", 0)
             variant = Variant.objects.create(product=product, **variant_data)
             Stock.objects.create(variant=variant, quantity=quantity)

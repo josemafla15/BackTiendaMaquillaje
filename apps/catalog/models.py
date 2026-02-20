@@ -68,7 +68,7 @@ class Product(TimeStampedModel):
     )
     description = models.TextField()
     short_description = models.CharField(max_length=500, blank=True)
-    cover_image = CloudinaryField("products/covers")
+    cover_image = CloudinaryField("products/covers", blank=True, null=True)
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
     meta_title = models.CharField(max_length=255, blank=True)

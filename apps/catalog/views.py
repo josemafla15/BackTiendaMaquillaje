@@ -114,6 +114,20 @@ class ProductViewSet(viewsets.ModelViewSet):
         ]
         return Response(data)
 
+    @action(detail=True, methods=["patch"], url_path="upload-image")
+    def upload_image(self, request, slug: str | None = None):
+        """Sube o reemplaza la imagen principal del producto."""
+        product = self.get_object()
+        image = request.FILES.get("cover_image")
+        if not image:
+            return Response(
+                {"error": "No se proporcionó ninguna imagen."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        product.cover_image = image
+        product.save(update_fields=["cover_image"])
+        return Response({"cover_image": product.cover_image.url})
+
 
 class VariantViewSet(
     mixins.RetrieveModelMixin,
