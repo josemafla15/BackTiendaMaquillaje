@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -26,7 +26,7 @@ class BrandViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsAdminUser()]
-        return super().get_permissions()
+        return [AllowAny()]
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -37,7 +37,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsAdminUser()]
-        return [IsAuthenticatedOrReadOnly()]
+        return [AllowAny()]
 
 
 class ProductViewSet(viewsets.ModelViewSet):
@@ -63,12 +63,13 @@ class ProductViewSet(viewsets.ModelViewSet):
             "gallery",
             "categories",
         )
-    )
+        .distinct()  # ← agregar esta línea
+)
     lookup_field = "slug"
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = ProductFilter
     search_fields = ["name", "description", "brand__name", "variants__sku"]
-    ordering_fields = ["name", "created_at"]
+    ordering_fields = ["name", "created_at", "variants__price"]
     ordering = ["-created_at"]
 
     def get_serializer_class(self):
@@ -81,7 +82,8 @@ class ProductViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update", "destroy", "add_variant"]:
             return [IsAdminUser()]
-        return [IsAuthenticatedOrReadOnly()]
+        return [AllowAny()]
+
 
     @action(detail=True, methods=["post"], url_path="add-variant")
     def add_variant(self, request, slug: str | None = None):

@@ -35,6 +35,8 @@ class Order(TimeStampedModel):
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="orders",
+        null=True,
+        blank=True,
     )
     status = models.CharField(
         max_length=30,
@@ -42,6 +44,10 @@ class Order(TimeStampedModel):
         default=Status.PENDING_PAYMENT,
         db_index=True,
     )
+
+    # Datos del cliente anónimo
+    guest_email = models.EmailField(blank=True)
+    guest_name = models.CharField(max_length=255, blank=True)
 
     # Snapshot de montos (inmutables después del pago)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
