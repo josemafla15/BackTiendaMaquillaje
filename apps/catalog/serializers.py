@@ -114,17 +114,22 @@ class ProductListSerializer(serializers.ModelSerializer):
     )
     cover_image = serializers.SerializerMethodField()
 
+    has_discount = serializers.SerializerMethodField()
+
     def get_cover_image(self, obj) -> str | None:
         if obj.cover_image:
             return obj.cover_image.url
         return None
+    
+    def get_has_discount(self, obj):
+        return obj.variants.filter(is_active=True, sale_price__isnull=False).exists()
 
     class Meta:
         model = Product
         fields = [
             "id", "name", "slug", "brand_name", "cover_image",
             "short_description", "base_price", "variant_count",
-            "is_active", "is_featured",
+            "is_active", "is_featured", "has_discount",
         ]
 
 class ProductDetailSerializer(serializers.ModelSerializer):
