@@ -12,17 +12,27 @@ from apps.inventory.models import Stock
 
 
 class BrandSerializer(serializers.ModelSerializer):
+    logo = serializers.SerializerMethodField()
+
     class Meta:
         model = Brand
         fields = ["id", "name", "slug", "logo", "description", "is_active"]
 
+    def get_logo(self, obj) -> str | None:
+        if obj.logo:
+            return obj.logo.url
+        return None
 
 class CategorySerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
         fields = ["id", "name", "slug", "parent", "image", "is_active", "children"]
+
+    def get_image(self, obj) -> str | None:
+        return obj.image.url if obj.image else None
 
     def get_children(self, obj: Category) -> list[dict]:
         return CategorySerializer(
@@ -83,9 +93,15 @@ class VariantWriteSerializer(serializers.ModelSerializer):
 class VariantReadSerializer(serializers.ModelSerializer):
     stock = StockSerializer(read_only=True)
     attribute_values = VariantAttributeSerializer(many=True, read_only=True)
-    effective_price = serializers.DecimalField(
-        max_digits=12, decimal_places=2, read_only=True
-    )
+    effective_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    image = serializers.SerializerMethodField()
+    swatch_image = serializers.SerializerMethodField()
+
+    def get_image(self, obj) -> str | None:
+        return obj.image.url if obj.image else None
+
+    def get_swatch_image(self, obj) -> str | None:
+        return obj.swatch_image.url if obj.swatch_image else None
 
     class Meta:
         model = Variant
@@ -106,31 +122,45 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
 class ProductListSerializer(serializers.ModelSerializer):
     brand_name = serializers.CharField(source="brand.name", read_only=True)
-    base_price = serializers.DecimalField(
-        max_digits=12, decimal_places=2, read_only=True
-    )
-    variant_count = serializers.IntegerField(
-        source="variants.count", read_only=True
-    )
+    base_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    variant_count = serializers.IntegerField(source="variants.count", read_only=True)
     cover_image = serializers.SerializerMethodField()
-
     has_discount = serializers.SerializerMethodField()
+    variant_colors = serializers.SerializerMethodField()
+
+    variant_images = serializers.SerializerMethodField()
 
     def get_cover_image(self, obj) -> str | None:
         if obj.cover_image:
             return obj.cover_image.url
         return None
-    
+
     def get_has_discount(self, obj):
         return obj.variants.filter(is_active=True, sale_price__isnull=False).exists()
+
+    def get_variant_colors(self, obj) -> list:
+        return list(
+            obj.variants.filter(is_active=True)
+            .exclude(color_code='')
+            .values_list('color_code', flat=True)
+        )
+    
+    def get_variant_images(self, obj) -> list:
+        result = []
+        for v in obj.variants.filter(is_active=True):
+            result.append({
+                'color_code': v.color_code,
+                'image': v.image.url if v.image else None,
+            })
+        return result
 
     class Meta:
         model = Product
         fields = [
-            "id", "name", "slug", "brand_name", "cover_image",
-            "short_description", "base_price", "variant_count",
-            "is_active", "is_featured", "has_discount",
-        ]
+        "id", "name", "slug", "brand_name", "cover_image",
+        "short_description", "base_price", "variant_count",
+        "is_active", "is_featured", "has_discount", "variant_colors", "variant_images",
+    ]
 
 class ProductDetailSerializer(serializers.ModelSerializer):
     """Serializer completo para el detalle del producto."""

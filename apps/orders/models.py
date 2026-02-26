@@ -8,6 +8,7 @@ from common.models import TimeStampedModel
 from apps.catalog.models import Variant
 from apps.promotions.models import Coupon
 
+import uuid
 
 class Order(TimeStampedModel):
     """
@@ -19,6 +20,12 @@ class Order(TimeStampedModel):
       Order → Refund (1:N): Un pedido puede tener múltiples reembolsos
               parciales o un reembolso total.
     """
+
+    def save(self, *args, **kwargs):
+        # Genera wompi_reference automáticamente si está vacío
+        if not self.wompi_reference:
+            self.wompi_reference = f"ORD-{uuid.uuid4().hex[:12].upper()}"
+        super().save(*args, **kwargs)
 
     class Status(models.TextChoices):
         PENDING_PAYMENT = "PENDING_PAYMENT", "Pendiente de pago"

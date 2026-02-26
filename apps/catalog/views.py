@@ -89,7 +89,9 @@ class ProductViewSet(viewsets.ModelViewSet):
     def add_variant(self, request, slug: str | None = None):
         """Agrega una variante a un producto existente."""
         product = self.get_object()
-        serializer = VariantWriteSerializer(data={**request.data, "product": product.id})
+        data = request.data.copy()
+        data["product"] = product.id
+        serializer = VariantWriteSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         variant = serializer.save(product=product)
         return Response(
