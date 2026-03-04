@@ -27,7 +27,7 @@ environ.Env.read_env(BASE_DIR / ".env")
 # ─────────────────────────────────────────────
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-d-2##(cmjmf0$48qufd)yini1!+%_t#*t0u&&z(dhb0kd#(@!1")
 DEBUG = env("DEBUG")
-ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+ALLOWED_HOSTS = env("ALLOWED_HOSTS") + ["perforable-avidly-samira.ngrok-free.dev"]
 
 
 # ─────────────────────────────────────────────
@@ -241,6 +241,7 @@ CORS_ALLOW_CREDENTIALS = True
 WOMPI_PUBLIC_KEY  = env("WOMPI_PUBLIC_KEY",  default="")
 WOMPI_PRIVATE_KEY = env("WOMPI_PRIVATE_KEY", default="")
 WOMPI_EVENTS_SECRET = env("WOMPI_EVENTS_SECRET", default="")  # Para validar webhooks
+WOMPI_INTEGRITY_SECRET = env("WOMPI_INTEGRITY_SECRET", default="")
 WOMPI_SANDBOX = env.bool("WOMPI_SANDBOX", default=True)
 WOMPI_BASE_URL = (
     "https://sandbox.wompi.co/v1"
@@ -269,6 +270,7 @@ CELERY_ACCEPT_CONTENT     = ["json"]
 CELERY_TASK_SERIALIZER    = "json"
 CELERY_RESULT_SERIALIZER  = "json"
 CELERY_TIMEZONE           = TIME_ZONE
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 
 # ─────────────────────────────────────────────
@@ -331,3 +333,15 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Límite de subida de imágenes (10 MB)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+
+# ─────────────────────────────────────────────
+# Celery Beat — Tareas periódicas
+# ─────────────────────────────────────────────
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    "release-expired-reservations": {
+        "task": "orders.release_expired_reservations",
+        "schedule": crontab(minute="*/15"),  # Cada 15 minutos
+    },
+}

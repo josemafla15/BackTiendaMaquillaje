@@ -85,7 +85,8 @@ class Order(TimeStampedModel):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"Order #{self.id} — {self.user.email} — {self.status}"
+        email = self.user.email if self.user else self.guest_email
+        return f"Order #{self.id} — {email} — {self.status}"
 
     @transaction.atomic
     def cancel(self) -> None:
@@ -99,7 +100,7 @@ class Order(TimeStampedModel):
         if self.status not in cancellable_statuses:
             raise ValueError(f"No se puede cancelar un pedido en estado '{self.status}'.")
         for item in self.items.select_related("variant__stock").all():
-            item.variant.stock.restore(item.quantity)
+            item.variant.stock.release_reservation(item.quantity)
         self.status = self.Status.CANCELLED
         self.save(update_fields=["status", "updated_at"])
 
@@ -175,27 +176,33 @@ class Refund(TimeStampedModel):
 
     @transaction.atomic
     def approve(self) -> None:
-        """
-        Aprueba el reembolso:
-          1. Marca como APPROVED.
-          2. Restaura stock en cada variante afectada.
-          3. Actualiza el estado del pedido.
-        """
         from django.utils import timezone
-
+        from apps.payments.wompi import WompiService
+    
         if self.status != self.Status.PENDING:
             raise ValueError("Solo se pueden aprobar reembolsos en estado PENDING.")
-
+    
+        # ── Llamar a Wompi primero ─────────────────────────────────────────
+        transaction_id = self.order.wompi_transaction_id
+        if transaction_id:
+            wompi = WompiService()
+            amount_in_cents = int(self.amount * 100)
+            result = wompi.refund_transaction(transaction_id, amount_in_cents)
+            if result is None:
+                raise ValueError("Error al procesar el reembolso en Wompi.")
+            self.wompi_refund_id = result.get("id", "")
+    
+        # ── Restaurar stock ────────────────────────────────────────────────
         for refund_item in self.items.select_related(
             "order_item__variant__stock"
         ).all():
             refund_item.order_item.variant.stock.restore(refund_item.quantity)
             refund_item.order_item.refunded_quantity += refund_item.quantity
             refund_item.order_item.save(update_fields=["refunded_quantity"])
-
+    
         self.status = self.Status.APPROVED
         self.processed_at = timezone.now()
-        self.save(update_fields=["status", "processed_at", "updated_at"])
+        self.save(update_fields=["status", "wompi_refund_id", "processed_at", "updated_at"])
         self._update_order_status()
 
     def _update_order_status(self) -> None:

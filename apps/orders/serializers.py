@@ -48,13 +48,48 @@ class RefundItemSerializer(serializers.ModelSerializer):
         fields = ["id", "order_item", "quantity", "reason"]
 
 
+
+
+class RefundItemWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RefundItem
+        fields = ["order_item", "quantity", "reason"]
+
+    def validate(self, attrs):
+        order_item = attrs["order_item"]
+        quantity = attrs["quantity"]
+        if quantity > order_item.refundable_quantity:
+            raise serializers.ValidationError(
+                f"Cantidad ({quantity}) supera la disponible ({order_item.refundable_quantity})."
+            )
+        return attrs
+
+
 class RefundSerializer(serializers.ModelSerializer):
     items = RefundItemSerializer(many=True, read_only=True)
+    items_write = RefundItemWriteSerializer(many=True, write_only=True, source="items")
 
     class Meta:
         model = Refund
         fields = [
             "id", "order", "status", "reason",
-            "amount", "items", "processed_at",
+            "amount", "items", "items_write", "processed_at",
         ]
         read_only_fields = ["status", "processed_at"]
+
+    def validate(self, attrs):
+        order = attrs.get("order")
+        allowed = [Order.Status.DELIVERED, Order.Status.PARTIALLY_REFUNDED]
+        if order.status not in allowed:
+            raise serializers.ValidationError(
+                f"Solo se pueden crear reembolsos para órdenes entregadas. "
+                f"Estado actual: {order.status}"
+            )
+        return attrs
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items")
+        refund = Refund.objects.create(**validated_data)
+        for item_data in items_data:
+            RefundItem.objects.create(refund=refund, **item_data)
+        return refund

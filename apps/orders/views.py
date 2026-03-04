@@ -69,8 +69,20 @@ class RefundViewSet(
 ):
     permission_classes = [IsAdminUser]
     serializer_class = RefundSerializer
-    queryset = Refund.objects.select_related("order").all()
-
+    queryset = Refund.objects.select_related("order").order_by("-created_at")
+    
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        refund = self.get_object()
+        if refund.status != Refund.Status.PENDING:
+            return Response(
+                {"detail": "Solo se pueden rechazar reembolsos en estado PENDING."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        refund.status = Refund.Status.REJECTED
+        refund.save(update_fields=["status", "updated_at"])
+        return Response({"status": "rechazado"})
+    
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         refund = self.get_object()
