@@ -206,14 +206,18 @@ class Refund(TimeStampedModel):
         self._update_order_status()
 
     def _update_order_status(self) -> None:
+        from apps.orders.tasks import send_refund_email  # ← agrega
         order = self.order
         total_items = sum(i.quantity for i in order.items.all())
         total_refunded_qty = sum(i.refunded_quantity for i in order.items.all())
         if total_refunded_qty >= total_items:
             order.status = Order.Status.REFUNDED
+            is_partial = False
         else:
             order.status = Order.Status.PARTIALLY_REFUNDED
+            is_partial = True
         order.save(update_fields=["status", "updated_at"])
+        send_refund_email.delay(str(order.id), str(self.amount), self.reason, is_partial)  # ← agrega
 
 
 class RefundItem(models.Model):

@@ -345,3 +345,4 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(minute="*/15"),  # Cada 15 minutos
     },
 }
+

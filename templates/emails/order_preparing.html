@@ -1,0 +1,10 @@
+{% extends "emails/base.html" %}
+{% block content %}
+<h2>Estamos preparando tu pedido 🔧</h2>
+<p>Hola <strong>{{ name }}</strong>, tu pedido está siendo preparado por nuestro equipo.</p>
+<div class="order-box">
+  <p>Referencia: <strong>{{ reference }}</strong></p>
+  <p>Total: <strong>{{ total }}</strong></p>
+</div>
+<p>Te notificaremos cuando sea enviado.</p>
+{% endblock %}

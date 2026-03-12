@@ -1,0 +1,11 @@
+{% extends "emails/base.html" %}
+{% block content %}
+<h2>Reembolso aprobado 💰</h2>
+<p>Hola <strong>{{ name }}</strong>, tu reembolso fue procesado exitosamente.</p>
+<div class="order-box">
+  <p>Referencia: <strong>{{ reference }}</strong></p>
+  <p>Monto reembolsado: <strong>{{ refund_amount }}</strong></p>
+  <p>Motivo: <strong>{{ reason }}</strong></p>
+</div>
+<p>El dinero será devuelto según los tiempos de tu entidad bancaria.</p>
+{% endblock %}

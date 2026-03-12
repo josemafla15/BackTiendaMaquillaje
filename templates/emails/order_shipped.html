@@ -1,0 +1,11 @@
+{% extends "emails/base.html" %}
+{% block content %}
+<h2>¡Tu pedido fue enviado! 🚚</h2>
+<p>Hola <strong>{{ name }}</strong>, tu pedido está en camino.</p>
+<div class="order-box">
+  <p>Referencia: <strong>{{ reference }}</strong></p>
+  <p>Dirección de entrega: <strong>{{ address }}</strong></p>
+  <p>Ciudad: <strong>{{ city }}</strong></p>
+</div>
+<p>Pronto recibirás tu pedido. ¡Gracias por tu compra!</p>
+{% endblock %}

@@ -23,9 +23,12 @@ from .serializers import (
 )
 from .wompi import WompiService
 
+from apps.orders.tasks import send_order_paid_email
+
+
 logger = logging.getLogger(__name__)
 
-IVA_RATE = Decimal("0.19")
+IVA_DIVISOR = Decimal("1.19")
 
 
 class CheckoutView(APIView):
@@ -117,12 +120,13 @@ class CheckoutView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # ── 4. Calcular IVA (19% sobre subtotal neto después de descuento) ─
+        # ── 4. Calcular IVA incluido (para reportes internos) ─────────────────────
         subtotal_neto = subtotal - discount_amount
-        iva_amount = (subtotal_neto * IVA_RATE).quantize(Decimal("0.01"))
+        iva_base = (subtotal_neto / IVA_DIVISOR).quantize(Decimal("0.01"))
+        iva_amount = subtotal_neto - iva_base  # IVA extraído, no sumado
 
-        # ── 5. Total final ─────────────────────────────────────────────────
-        total = subtotal_neto + iva_amount + shipping_amount
+        # ── 5. Total final (sin sumar IVA) ─────────────────────────────────────────
+        total = subtotal_neto + shipping_amount
         amount_in_cents = int(total * 100)
 
         # ── 6. Crear Order ─────────────────────────────────────────────────
@@ -236,19 +240,19 @@ class WompiWebhookView(APIView):
         reference      = transaction_data.get("reference")
         wompi_status   = transaction_data.get("status")
         transaction_id = transaction_data.get("id")
-
+    
         if not reference:
             return
-
+    
         try:
             order = Order.objects.get(wompi_reference=reference)
         except Order.DoesNotExist:
             logger.error("Webhook: Order con referencia '%s' no encontrada.", reference)
             return
-
+    
         if transaction_id and not order.wompi_transaction_id:
             order.wompi_transaction_id = transaction_id
-
+    
         STATUS_MAP = {
             "APPROVED": Order.Status.PAID,
             "DECLINED": Order.Status.CANCELLED,
@@ -256,20 +260,20 @@ class WompiWebhookView(APIView):
             "ERROR":    Order.Status.CANCELLED,
             "PENDING":  Order.Status.PAYMENT_PROCESSING,
         }
-
+    
         new_status = STATUS_MAP.get(wompi_status)
         if new_status and order.status != new_status:
             if new_status == Order.Status.PAID:
                 for item in order.items.select_related("variant__stock").all():
                     item.variant.stock.confirm_sale(item.quantity)
+                send_order_paid_email.delay(str(order.id))  # ← solo aquí
             elif new_status == Order.Status.CANCELLED:
                 for item in order.items.select_related("variant__stock").all():
                     item.variant.stock.release_reservation(item.quantity)
-
+    
             order.status = new_status
             order.save(update_fields=["status", "wompi_transaction_id", "updated_at"])
             logger.info("Order %s → %s (Wompi: %s)", order.wompi_reference, new_status, wompi_status)
-
 
 class TransactionStatusView(APIView):
     """

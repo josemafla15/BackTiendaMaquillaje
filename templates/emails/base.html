@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tienda Maquillaje</title>
+  <style>
+    body { margin: 0; padding: 0; background: #f5f5f5; font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; }
+    .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .header { background: #c2185b; padding: 32px 40px; text-align: center; }
+    .header h1 { margin: 0; color: #fff; font-size: 22px; letter-spacing: 1px; }
+    .header p { margin: 6px 0 0; color: #f8bbd0; font-size: 13px; }
+    .body { padding: 36px 40px; }
+    .body h2 { font-size: 20px; color: #c2185b; margin-top: 0; }
+    .body p { font-size: 15px; line-height: 1.6; color: #555; }
+    .order-box { background: #fce4ec; border-radius: 6px; padding: 16px 20px; margin: 20px 0; }
+    .order-box p { margin: 4px 0; font-size: 14px; color: #444; }
+    .order-box strong { color: #c2185b; }
+    table.items { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+    table.items th { background: #fce4ec; color: #c2185b; padding: 8px 12px; text-align: left; }
+    table.items td { padding: 8px 12px; border-bottom: 1px solid #f5f5f5; color: #555; }
+    .footer { background: #f5f5f5; padding: 20px 40px; text-align: center; font-size: 12px; color: #999; }
+    .footer a { color: #c2185b; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>💄 Tienda Maquillaje</h1>
+      <p>Tu tienda de belleza favorita</p>
+    </div>
+    <div class="body">
+      {% block content %}{% endblock %}
+    </div>
+    <div class="footer">
+      <p>Este correo fue enviado automáticamente, por favor no respondas.</p>
+      <p>© 2026 Tienda Maquillaje</p>
+    </div>
+  </div>
+</body>
+</html>

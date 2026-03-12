@@ -1,0 +1,23 @@
+{% extends "emails/base.html" %}
+{% block content %}
+<h2>¡Pago confirmado! 🎉</h2>
+<p>Hola <strong>{{ name }}</strong>, recibimos tu pago correctamente.</p>
+<div class="order-box">
+  <p>Referencia: <strong>{{ reference }}</strong></p>
+  <p>Total pagado: <strong>{{ total }}</strong></p>
+  <p>Fecha: <strong>{{ date }}</strong></p>
+</div>
+<table class="items">
+  <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th></tr></thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <td>{{ item.product_name }} — {{ item.variant_name }}</td>
+      <td>{{ item.quantity }}</td>
+      <td>{{ item.unit_price }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p>Pronto comenzaremos a preparar tu pedido.</p>
+{% endblock %}

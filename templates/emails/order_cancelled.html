@@ -1,0 +1,10 @@
+{% extends "emails/base.html" %}
+{% block content %}
+<h2>Pedido cancelado ❌</h2>
+<p>Hola <strong>{{ name }}</strong>, tu pedido fue cancelado.</p>
+<div class="order-box">
+  <p>Referencia: <strong>{{ reference }}</strong></p>
+  <p>Total: <strong>{{ total }}</strong></p>
+</div>
+<p>Si tienes alguna duda, contáctanos.</p>
+{% endblock %}
