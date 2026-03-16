@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
+from django.db import models
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -164,11 +165,7 @@ class CheckoutView(APIView):
             )
             variant.stock.reserve(item["quantity"])
 
-        # ── 8. Incrementar uso del cupón ───────────────────────────────────
-        if coupon:
-            Coupon.objects.filter(pk=coupon.pk).update(
-                used_count=coupon.used_count + 1
-            )
+    
 
         # ── 9. Generar datos para Widget Wompi ─────────────────────────────
         wompi = WompiService()
@@ -266,7 +263,11 @@ class WompiWebhookView(APIView):
             if new_status == Order.Status.PAID:
                 for item in order.items.select_related("variant__stock").all():
                     item.variant.stock.confirm_sale(item.quantity)
-                send_order_paid_email.delay(str(order.id))  # ← solo aquí
+                if order.coupon_id:
+                    Coupon.objects.filter(pk=order.coupon_id).update(
+                        used_count=models.F('used_count') + 1
+                    )
+                send_order_paid_email.delay(str(order.id))
             elif new_status == Order.Status.CANCELLED:
                 for item in order.items.select_related("variant__stock").all():
                     item.variant.stock.release_reservation(item.quantity)
@@ -274,6 +275,43 @@ class WompiWebhookView(APIView):
             order.status = new_status
             order.save(update_fields=["status", "wompi_transaction_id", "updated_at"])
             logger.info("Order %s → %s (Wompi: %s)", order.wompi_reference, new_status, wompi_status)
+            reference      = transaction_data.get("reference")
+            wompi_status   = transaction_data.get("status")
+            transaction_id = transaction_data.get("id")
+        
+            if not reference:
+                return
+        
+            try:
+                order = Order.objects.get(wompi_reference=reference)
+            except Order.DoesNotExist:
+                logger.error("Webhook: Order con referencia '%s' no encontrada.", reference)
+                return
+        
+            if transaction_id and not order.wompi_transaction_id:
+                order.wompi_transaction_id = transaction_id
+        
+            STATUS_MAP = {
+                "APPROVED": Order.Status.PAID,
+                "DECLINED": Order.Status.CANCELLED,
+                "VOIDED":   Order.Status.CANCELLED,
+                "ERROR":    Order.Status.CANCELLED,
+                "PENDING":  Order.Status.PAYMENT_PROCESSING,
+            }
+        
+            new_status = STATUS_MAP.get(wompi_status)
+            if new_status and order.status != new_status:
+                if new_status == Order.Status.PAID:
+                    for item in order.items.select_related("variant__stock").all():
+                        item.variant.stock.confirm_sale(item.quantity)
+                    send_order_paid_email.delay(str(order.id))  # ← solo aquí
+                elif new_status == Order.Status.CANCELLED:
+                    for item in order.items.select_related("variant__stock").all():
+                        item.variant.stock.release_reservation(item.quantity)
+        
+                order.status = new_status
+                order.save(update_fields=["status", "wompi_transaction_id", "updated_at"])
+                logger.info("Order %s → %s (Wompi: %s)", order.wompi_reference, new_status, wompi_status)
 
 class TransactionStatusView(APIView):
     """

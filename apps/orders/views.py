@@ -324,22 +324,14 @@ class OrderViewSet(
 
         items_current  = items_qs(qs_current)
         items_previous = items_qs(qs_previous)
-
         def agg(qs_orders, qs_items):
-            result = qs_orders.aggregate(
-                subtotal=Sum("subtotal"),
-                discount=Sum("discount_amount"),
-                count=Count("id")
-            )
-            subtotal = float(result["subtotal"] or 0)
-            discount = float(result["discount"] or 0)
-            rev = subtotal - discount
-            cnt = result["count"] or 0
+            rev = float(qs_items.aggregate(total=Sum("subtotal"))["total"] or 0)
+            cnt = qs_items.values("order").distinct().count()
             return rev, cnt, (rev / cnt if cnt else 0)
 
         rev,      orders,      ticket      = agg(qs_current,  items_current)
         prev_rev, prev_orders, prev_ticket = agg(qs_previous, items_previous)
-
+        
         def pct(current, previous):
             if not previous:
                 return 100.0 if current > 0 else 0.0
